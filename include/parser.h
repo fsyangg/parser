@@ -2,10 +2,13 @@ namespace parser
 {
 
 template <char C>
-struct literal {
+struct literal
+{
     template <typename Iterator>
-    static constexpr auto match(Iterator cur, Iterator end) {
-        if (cur == end || *cur != C) {
+    static constexpr auto match(Iterator& cur, Iterator end)
+    {
+        if (cur == end || *cur != C)
+        {
             return false;
         }
         ++cur;
@@ -14,16 +17,31 @@ struct literal {
 };
 
 template <typename... Productions>
-struct seq {
-    template <typename Input>
-    static constexpr auto match(Input in) {
-        return (Productions::match(in) && ...);
+struct seq
+{
+    template <typename Iterator>
+    static constexpr auto match(Iterator& cur, Iterator end)
+    {
+        return (cur == end || (Productions::match(cur, end) && ...));
+    }
+};
+
+// technically don't need
+template <>
+struct seq<>
+{
+    template <typename Iterator>
+    static constexpr auto match(Iterator& cur, Iterator end)
+    {
+        return true;
     }
 };
 
 template <typename Production, typename Iterator>
-static constexpr auto parse(Iterator begin, Iterator end) {
-    return Production::match(begin, end);
+static constexpr auto parse(Iterator begin, Iterator end)
+{  // creates copy, removes cv
+    auto res{Production::match(begin, end)};
+    return res && begin == end;
 }
 
 }  // namespace parser

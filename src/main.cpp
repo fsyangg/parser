@@ -6,6 +6,6 @@ int main() {
     using namespace std::string_view_literals;
     using namespace parser;
     constexpr auto s{"y"sv};
-    constexpr auto b{parser::parse<parser::literal<'x'>>(s)};
+    constexpr auto b{parser::parse<parser::literal<'x'>>(s.begin(), s.end())};
     static_assert(!b);
 }

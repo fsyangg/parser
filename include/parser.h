@@ -26,7 +26,6 @@ struct seq
     }
 };
 
-// technically don't need
 template <>
 struct seq<>
 {
@@ -39,7 +38,7 @@ struct seq<>
 
 template <typename Production, typename Iterator>
 static constexpr auto parse(Iterator begin, Iterator end)
-{  // creates copy, removes cv
+{
     auto res{Production::match(begin, end)};
     return res && begin == end;
 }

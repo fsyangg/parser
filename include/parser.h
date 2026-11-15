@@ -30,6 +30,19 @@ struct period
     }
 };
 
+template <typename Production>
+struct star
+{
+    template <typename Iterator>
+    static constexpr auto match(Iterator& cur, Iterator end)
+    {
+        if (cur == end || !Production::match(cur, end)) {
+            return true;
+        }
+        return match(cur, end);
+    }
+};
+
 template <typename... Productions>
 struct seq
 {

@@ -16,6 +16,20 @@ struct literal
     }
 };
 
+struct period
+{
+    template <typename Iterator>
+    static constexpr auto match(Iterator& cur, Iterator end)
+    {
+        if (cur == end)
+        {
+            return false;
+        }
+        ++cur;
+        return true;
+    }
+};
+
 template <typename... Productions>
 struct seq
 {

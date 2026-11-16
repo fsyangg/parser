@@ -23,9 +23,7 @@ enable_testing()
 
 add_executable(
     test_exe
-    test/test_literal.cpp
-    test/test_seq.cpp
-    test/test_period.cpp
+    test/test_parser.cpp
 )
 
 target_link_libraries(test_exe GTest::gtest_main)

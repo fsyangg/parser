@@ -115,3 +115,62 @@ TEST(Star, InSequence)
     static_assert(!b2);
     EXPECT_FALSE(b2);
 }
+
+TEST(Star, Strings)
+{
+    using ab = parser::seq<parser::literal<'a'>, parser::literal<'b'>>;
+    using prod = parser::star<ab>;
+
+    constexpr auto good_strs = std::to_array<std::string_view>({"", "ab", "ababababab"});
+    constexpr auto bad_strs =
+        std::to_array<std::string_view>({"a", "aa", "aab", "abb", "aba", "abaa"});
+    constexpr auto good{std::ranges::all_of(
+        good_strs, [](auto s) { return parser::parse<prod>(s.begin(), s.end()); })};
+    static_assert(good);
+    EXPECT_TRUE(good);
+
+    constexpr auto bad{std::ranges::all_of(
+        bad_strs, [](auto s) { return parser::parse<prod>(s.begin(), s.end()); })};
+    static_assert(!bad);
+    EXPECT_FALSE(bad);
+}
+
+TEST(Plus, Basic)
+{
+    using aplus = parser::plus<parser::literal<'a'>>;
+    using bplus = parser::plus<parser::literal<'b'>>;
+    using prod = parser::seq<aplus, bplus>;
+
+    constexpr auto good_strs =
+        std::to_array<std::string_view>({"ab", "aaaaaaab", "abbbbbbbbb", "aabb"});
+    constexpr auto b{std::ranges::all_of(
+        good_strs, [](auto s) { return parser::parse<prod>(s.begin(), s.end()); })};
+    static_assert(b);
+    EXPECT_TRUE(b);
+
+    constexpr auto bad_strs =
+        std::to_array<std::string_view>({"a", "b", "aaaaa", "bbbbb", "ba", "baa"});
+    constexpr auto b2{std::ranges::all_of(
+        bad_strs, [](auto s) { return parser::parse<prod>(s.begin(), s.end()); })};
+    static_assert(!b2);
+    EXPECT_FALSE(b2);
+}
+
+TEST(Plus, Strings)
+{
+    using ab = parser::seq<parser::literal<'a'>, parser::literal<'b'>>;
+    using prod = parser::plus<ab>;
+
+    constexpr auto good_strs =
+        std::to_array<std::string_view>({"ab", "ababab", "abababababababab"});
+    constexpr auto b{std::ranges::all_of(
+        good_strs, [](auto s) { return parser::parse<prod>(s.begin(), s.end()); })};
+    static_assert(b);
+    EXPECT_TRUE(b);
+
+    constexpr auto bad_strs = std::to_array<std::string_view>({"", "a", "aa", "ababa", "abb"});
+    constexpr auto b2{std::ranges::all_of(
+        bad_strs, [](auto s) { return parser::parse<prod>(s.begin(), s.end()); })};
+    static_assert(!b2);
+    EXPECT_FALSE(b2);
+}

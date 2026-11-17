@@ -101,6 +101,11 @@ void test_star_strings()
 
     static_assert(all_parse<prod>({"", "ab", "ababababab"}));
     static_assert(none_parse<prod>({"a", "aa", "aab", "abb", "aba", "abaa"}));
+
+    using then_a = seq<prod, literal<'a'>>;
+    static_assert(all_parse<then_a>({"a", "aba", "ababa"}));
+    static_assert(none_parse<then_a>({"ab", "abab", "abaa"}));
+    static_assert(none_parse<prod>({"a"}));
 }
 
 void test_plus_basic()
@@ -120,6 +125,10 @@ void test_plus_strings()
 
     static_assert(all_parse<prod>({"ab", "ababab", "abababababababab"}));
     static_assert(none_parse<prod>({"", "a", "aa", "ababa", "abb"}));
+
+    using then_a = seq<prod, literal<'a'>>;
+    static_assert(all_parse<then_a>({"aba", "ababa"}));
+    static_assert(none_parse<then_a>({"a", "ab", "abaa"}));
 }
 
 void test_branch_basic()

@@ -1,3 +1,5 @@
+namespace rp
+{
 namespace parser
 {
 
@@ -74,6 +76,33 @@ struct seq<>
     }
 };
 
+template <typename First, typename... Rest>
+struct branch
+{
+    template <typename Iterator>
+    static constexpr auto match(Iterator& cur, Iterator end)
+    {
+        const auto copy = cur;
+        if (First::match(cur, end))
+        {
+            return true;
+        }
+        cur = copy;
+        return (Rest::match(cur, end) || ...);
+    }
+};
+
+template <typename First>
+struct branch<First>
+{
+    template <typename Iterator>
+    static constexpr auto match(Iterator& cur, Iterator end)
+    {
+        // do we need to unwind here, not sure
+        return First::match(cur, end);
+    }
+};
+
 template <typename Production, typename Iterator>
 static constexpr auto parse(Iterator begin, Iterator end)
 {
@@ -82,3 +111,4 @@ static constexpr auto parse(Iterator begin, Iterator end)
 }
 
 }  // namespace parser
+}  // namespace rp

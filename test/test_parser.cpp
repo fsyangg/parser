@@ -1,176 +1,200 @@
-#include <gtest/gtest.h>
-
 #include <algorithm>
+#include <initializer_list>
 #include <string_view>
 
 #include "parser.h"
 
-TEST(Literal, Basic)
+namespace rp
 {
-    using prod = parser::literal<'x'>;
+namespace tests
+{
 
-    constexpr std::string_view wrong{"y"};
-    EXPECT_FALSE(parser::parse<prod>(wrong.begin(), wrong.end()));
+using namespace rp::parser;
 
-    constexpr std::string_view right{"x"};
-    EXPECT_TRUE(parser::parse<prod>(right.begin(), right.end()));
+template <typename Prod, auto Func>
+struct parse_func
+{
+    static constexpr bool operator()(std::initializer_list<std::string_view> strs)
+    {
+        return Func(strs, [](auto s) { return parse<Prod>(s.begin(), s.end()); });
+    }
+};
 
-    EXPECT_FALSE(parser::parse<prod>(right.begin(), right.begin()));
+template <typename Prod>
+constexpr parse_func<Prod, std::ranges::all_of> all_parse{};
+
+template <typename Prod>
+constexpr parse_func<Prod, std::ranges::none_of> none_parse{};
+
+void test_literal()
+{
+    using prod = literal<'x'>;
+
+    static_assert(all_parse<prod>({"x"}));
+    static_assert(!all_parse<prod>({"y"}));
 }
 
-TEST(Period, Basic)
+void test_period_basic() { static_assert(all_parse<period>({"a"})); }
+
+void test_period_sequence()
 {
-    using prod = parser::period;
-    constexpr std::string_view s{"a"};
-    constexpr auto b{parser::parse<prod>(s.begin(), s.end())};
-    EXPECT_TRUE(b);
+    using prod = seq<period, period>;
+
+    static_assert(all_parse<prod>({"aa"}));
+    static_assert(none_parse<prod>({"aaa", "a"}));
 }
 
-TEST(Period, Sequence)
+void test_seq_basic()
 {
-    using prod = parser::seq<parser::period, parser::period>;
-    constexpr std::string_view s{"aa"};
-    constexpr auto b{parser::parse<prod>(s.begin(), s.end())};
-    EXPECT_TRUE(b);
+    using prod = seq<literal<'a'>, literal<'b'>, literal<'c'>>;
 
-    constexpr std::string_view s2{"aaa"};
-    constexpr auto b2{parser::parse<prod>(s2.begin(), s2.end())};
-    EXPECT_FALSE(b2);
-
-    constexpr std::string_view s3{"a"};
-    constexpr auto b3{parser::parse<prod>(s3.begin(), s3.end())};
-    EXPECT_FALSE(b3);
+    static_assert(all_parse<prod>({"abc"}));
+    static_assert(none_parse<prod>({"abd"}));
 }
 
-TEST(Seq, Basic)
+void test_seq_repeat()
 {
-    using prod = parser::seq<parser::literal<'a'>, parser::literal<'b'>, parser::literal<'c'>>;
+    using prod = seq<literal<'a'>, literal<'a'>, literal<'a'>>;
 
-    constexpr std::string_view good{"abc"};
-    EXPECT_TRUE(parser::parse<prod>(good.begin(), good.end()));
-
-    constexpr std::string_view bad{"abd"};
-    EXPECT_FALSE(parser::parse<prod>(bad.begin(), bad.end()));
+    static_assert(all_parse<prod>({"aaa"}));
+    static_assert(none_parse<prod>({"bbb"}));
 }
 
-TEST(Seq, Repeat)
+void test_seq_empty()
 {
-    using prod = parser::seq<parser::literal<'a'>, parser::literal<'a'>, parser::literal<'a'>>;
+    using prod = seq<>;
 
-    constexpr std::string_view bad{"bbb"};
-    EXPECT_FALSE(parser::parse<prod>(bad.begin(), bad.end()));
-
-    constexpr std::string_view good{"aaa"};
-    EXPECT_TRUE(parser::parse<prod>(good.begin(), good.end()));
+    static_assert(all_parse<prod>({""}));
+    static_assert(none_parse<prod>({"aaa"}));
 }
 
-TEST(Seq, Empty)
+void test_seq_lengths()
 {
-    using prod = parser::seq<>;
-    constexpr std::string_view good{"aaa"};
-    EXPECT_TRUE(parser::parse<prod>(good.begin(), good.begin()));
-    EXPECT_FALSE(parser::parse<prod>(good.begin(), good.end()));
+    using prod = seq<literal<'a'>, literal<'a'>>;
+
+    static_assert(none_parse<prod>({"a", "aaa"}));
+    static_assert(none_parse<prod>({""}));
 }
 
-TEST(Seq, Lengths)
+void test_star_basic()
 {
-    using two = parser::seq<parser::literal<'a'>, parser::literal<'a'>>;
+    using prod = star<literal<'a'>>;
 
-    constexpr std::string_view too_short{"a"};
-    EXPECT_FALSE(parser::parse<two>(too_short.begin(), too_short.end()));
-
-    constexpr std::string_view too_long{"aaa"};
-    EXPECT_FALSE(parser::parse<two>(too_long.begin(), too_long.end()));
+    static_assert(all_parse<prod>({"aaaaaaaaaa"}));
+    static_assert(none_parse<prod>({"bbbbb"}));
 }
 
-TEST(Star, Basic)
+void test_star_in_sequence()
 {
-    using prod = parser::star<parser::literal<'a'>>;
-    constexpr std::string_view repeat{"aaaaaaaaaa"};
-    constexpr auto repeat_res{parser::parse<prod>(repeat.begin(), repeat.end())};
-    static_assert(repeat_res);
-    EXPECT_TRUE(repeat_res);
+    using astar = star<literal<'a'>>;
+    using bstar = star<literal<'b'>>;
+    using prod = seq<astar, bstar>;
 
-    constexpr std::string_view none{"bbbbb"};
-    constexpr auto none_res{parser::parse<prod>(none.begin(), none.end())};
-    static_assert(!none_res);
-    EXPECT_FALSE(none_res);
+    static_assert(all_parse<prod>({"aa", "ab", "aab", "aabb", "bb"}));
+    static_assert(none_parse<prod>({"bbaa", "abba", "aaaba"}));
 }
 
-TEST(Star, InSequence)
+void test_star_strings()
 {
-    using astar = parser::star<parser::literal<'a'>>;
-    using bstar = parser::star<parser::literal<'b'>>;
-    using prod = parser::seq<astar, bstar>;
+    using ab = seq<literal<'a'>, literal<'b'>>;
+    using prod = star<ab>;
 
-    constexpr std::array<std::string_view, 6> strs{"aa", "ab", "aab", "aabb", "bb"};
-    constexpr auto b{
-        std::ranges::all_of(strs, [](auto s) { return parser::parse<prod>(s.begin(), s.end()); })};
-    static_assert(b);
-    EXPECT_TRUE(b);
-
-    constexpr std::array<std::string_view, 6> bad_strs{"bbaa", "abba", "aaaba"};
-    constexpr auto b2{std::ranges::all_of(
-        bad_strs, [](auto s) { return parser::parse<prod>(s.begin(), s.end()); })};
-    static_assert(!b2);
-    EXPECT_FALSE(b2);
+    static_assert(all_parse<prod>({"", "ab", "ababababab"}));
+    static_assert(none_parse<prod>({"a", "aa", "aab", "abb", "aba", "abaa"}));
 }
 
-TEST(Star, Strings)
+void test_plus_basic()
 {
-    using ab = parser::seq<parser::literal<'a'>, parser::literal<'b'>>;
-    using prod = parser::star<ab>;
+    using aplus = plus<literal<'a'>>;
+    using bplus = plus<literal<'b'>>;
+    using prod = seq<aplus, bplus>;
 
-    constexpr auto good_strs = std::to_array<std::string_view>({"", "ab", "ababababab"});
-    constexpr auto bad_strs =
-        std::to_array<std::string_view>({"a", "aa", "aab", "abb", "aba", "abaa"});
-    constexpr auto good{std::ranges::all_of(
-        good_strs, [](auto s) { return parser::parse<prod>(s.begin(), s.end()); })};
-    static_assert(good);
-    EXPECT_TRUE(good);
-
-    constexpr auto bad{std::ranges::all_of(
-        bad_strs, [](auto s) { return parser::parse<prod>(s.begin(), s.end()); })};
-    static_assert(!bad);
-    EXPECT_FALSE(bad);
+    static_assert(all_parse<prod>({"ab", "aaaaaaab", "abbbbbbbbb", "aabb"}));
+    static_assert(none_parse<prod>({"a", "b", "aaaaa", "bbbbb", "ba", "baa"}));
 }
 
-TEST(Plus, Basic)
+void test_plus_strings()
 {
-    using aplus = parser::plus<parser::literal<'a'>>;
-    using bplus = parser::plus<parser::literal<'b'>>;
-    using prod = parser::seq<aplus, bplus>;
+    using ab = seq<literal<'a'>, literal<'b'>>;
+    using prod = plus<ab>;
 
-    constexpr auto good_strs =
-        std::to_array<std::string_view>({"ab", "aaaaaaab", "abbbbbbbbb", "aabb"});
-    constexpr auto b{std::ranges::all_of(
-        good_strs, [](auto s) { return parser::parse<prod>(s.begin(), s.end()); })};
-    static_assert(b);
-    EXPECT_TRUE(b);
-
-    constexpr auto bad_strs =
-        std::to_array<std::string_view>({"a", "b", "aaaaa", "bbbbb", "ba", "baa"});
-    constexpr auto b2{std::ranges::all_of(
-        bad_strs, [](auto s) { return parser::parse<prod>(s.begin(), s.end()); })};
-    static_assert(!b2);
-    EXPECT_FALSE(b2);
+    static_assert(all_parse<prod>({"ab", "ababab", "abababababababab"}));
+    static_assert(none_parse<prod>({"", "a", "aa", "ababa", "abb"}));
 }
 
-TEST(Plus, Strings)
+void test_branch_basic()
 {
-    using ab = parser::seq<parser::literal<'a'>, parser::literal<'b'>>;
-    using prod = parser::plus<ab>;
+    using prod = branch<literal<'a'>, literal<'b'>, literal<'c'>>;
 
-    constexpr auto good_strs =
-        std::to_array<std::string_view>({"ab", "ababab", "abababababababab"});
-    constexpr auto b{std::ranges::all_of(
-        good_strs, [](auto s) { return parser::parse<prod>(s.begin(), s.end()); })};
-    static_assert(b);
-    EXPECT_TRUE(b);
-
-    constexpr auto bad_strs = std::to_array<std::string_view>({"", "a", "aa", "ababa", "abb"});
-    constexpr auto b2{std::ranges::all_of(
-        bad_strs, [](auto s) { return parser::parse<prod>(s.begin(), s.end()); })};
-    static_assert(!b2);
-    EXPECT_FALSE(b2);
+    static_assert(all_parse<prod>({"a", "b", "c"}));
+    static_assert(none_parse<prod>({"", "d", "ab", "ca", "aa"}));
 }
+
+void test_branch_single()
+{
+    using prod = branch<literal<'a'>>;
+
+    static_assert(all_parse<prod>({"a"}));
+    static_assert(none_parse<prod>({"", "b", "aa"}));
+}
+
+void test_branch_backtrack()
+{
+    using a = literal<'a'>;
+    using ab = seq<a, literal<'b'>>;
+    using ac = seq<a, literal<'c'>>;
+    using ad = seq<a, literal<'d'>>;
+    using prod = branch<ab, ac, ad>;
+
+    static_assert(all_parse<prod>({"ab", "ac", "ad"}));
+    static_assert(none_parse<prod>({"a", "ae", "ba", "abc", "aab"}));
+}
+
+void test_branch_ordered_choice()
+{
+    using a = literal<'a'>;
+    using ab = seq<a, literal<'b'>>;
+
+    // first matching alternative wins; no backtracking into a later one afterwards
+    using short_first = branch<a, ab>;
+    static_assert(none_parse<short_first>({"ab"}));
+
+    using long_first = branch<ab, a>;
+    static_assert(all_parse<long_first>({"a", "ab"}));
+}
+
+void test_branch_in_sequence()
+{
+    using ab = branch<literal<'a'>, literal<'b'>>;
+    using prod = seq<ab, literal<'c'>, ab>;
+
+    static_assert(all_parse<prod>({"aca", "acb", "bca", "bcb"}));
+    static_assert(none_parse<prod>({"ac", "cca", "abc", "acc", "acab"}));
+}
+
+void test_branch_repeated()
+{
+    using ab = branch<literal<'a'>, literal<'b'>>;
+    using star_prod = star<ab>;
+    using plus_prod = plus<ab>;
+
+    static_assert(all_parse<star_prod>({"", "a", "b", "abba", "bbbbaaaab"}));
+    static_assert(none_parse<star_prod>({"c", "abc", "cab", "abacab"}));
+
+    static_assert(all_parse<plus_prod>({"a", "b", "abba", "bbbbaaaab"}));
+    static_assert(none_parse<plus_prod>({"", "c", "abc", "cab", "abacab"}));
+}
+
+void test_branch_nested()
+{
+    using a = literal<'a'>;
+    using b = literal<'b'>;
+    using c = literal<'c'>;
+    using prod = branch<branch<a, b>, seq<c, branch<a, b>>>;
+
+    static_assert(all_parse<prod>({"a", "b", "ca", "cb"}));
+    static_assert(none_parse<prod>({"c", "cc", "ac", "cab"}));
+}
+
+}  // namespace tests
+}  // namespace rp

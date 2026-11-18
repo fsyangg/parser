@@ -62,32 +62,18 @@ struct seq
     template <typename Iterator>
     static constexpr auto match(Iterator& cur, Iterator end)
     {
+        if constexpr (sizeof...(Productions) == 0)
+        {
+            return true;
+        }
+
         const auto copy = cur;
-        if ((Productions::match(cur, end) && ...)) {
+        if ((Productions::match(cur, end) && ...))
+        {
             return true;
         }
         cur = copy;
         return false;
-    }
-};
-
-template <typename Production>
-struct seq<Production>
-{
-    template <typename Iterator>
-    static constexpr auto match(Iterator& cur, Iterator end)
-    {
-        return Production::match(cur, end);
-    }
-};
-
-template <>
-struct seq<>
-{
-    template <typename Iterator>
-    static constexpr auto match(Iterator& cur, Iterator end)
-    {
-        return true;
     }
 };
 

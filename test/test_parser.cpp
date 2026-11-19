@@ -16,7 +16,7 @@ struct parse_func
 {
     static constexpr bool operator()(std::initializer_list<std::string_view> strs)
     {
-        return Func(strs, [](auto s) { return parse<Prod>(s.begin(), s.end()); });
+        return Func(strs, [](auto s) { return match<Prod>(s.begin(), s.end()); });
     }
 };
 
@@ -28,25 +28,43 @@ constexpr parse_func<Prod, std::ranges::none_of> none_parse{};
 
 void test_literal()
 {
-    using prod = literal<'x'>;
+    struct prod
+    {
+        using match = literal<'x'>;
+    };
 
     static_assert(all_parse<prod>({"x"}));
     static_assert(!all_parse<prod>({"y"}));
 }
 
-void test_period_basic() { static_assert(all_parse<period>({"a"})); }
+void test_period_basic()
+{
+    struct prod
+    {
+        using match = period;
+    };
+
+    static_assert(all_parse<prod>({"a"}));
+}
 
 void test_period_sequence()
 {
-    using prod = seq<period, period>;
+    struct prod
+    {
+        using match = seq<period, period>;
+    };
 
     static_assert(all_parse<prod>({"aa"}));
-    static_assert(none_parse<prod>({"aaa", "a"}));
+    static_assert(none_parse<prod>({"aaa"}));
+    static_assert(none_parse<prod>({"a"}));
 }
 
 void test_seq_basic()
 {
-    using prod = seq<literal<'a'>, literal<'b'>, literal<'c'>>;
+    struct prod
+    {
+        using match = seq<literal<'a'>, literal<'b'>, literal<'c'>>;
+    };
 
     static_assert(all_parse<prod>({"abc"}));
     static_assert(none_parse<prod>({"abd"}));
@@ -54,7 +72,10 @@ void test_seq_basic()
 
 void test_seq_repeat()
 {
-    using prod = seq<literal<'a'>, literal<'a'>, literal<'a'>>;
+    struct prod
+    {
+        using match = seq<literal<'a'>, literal<'a'>, literal<'a'>>;
+    };
 
     static_assert(all_parse<prod>({"aaa"}));
     static_assert(none_parse<prod>({"bbb"}));
@@ -62,7 +83,10 @@ void test_seq_repeat()
 
 void test_seq_empty()
 {
-    using prod = seq<>;
+    struct prod
+    {
+        using match = seq<>;
+    };
 
     static_assert(all_parse<prod>({""}));
     static_assert(none_parse<prod>({"aaa"}));
@@ -70,7 +94,10 @@ void test_seq_empty()
 
 void test_seq_lengths()
 {
-    using prod = seq<literal<'a'>, literal<'a'>>;
+    struct prod
+    {
+        using match = seq<literal<'a'>, literal<'a'>>;
+    };
 
     static_assert(none_parse<prod>({"a", "aaa"}));
     static_assert(none_parse<prod>({""}));

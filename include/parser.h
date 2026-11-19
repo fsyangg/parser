@@ -1,3 +1,5 @@
+#include <utility>
+
 namespace rp
 {
 namespace parser
@@ -6,29 +8,31 @@ namespace parser
 template <char C>
 struct literal
 {
-    template <typename Iterator>
-    static constexpr auto match(Iterator& cur, Iterator end)
+    template <typename It, typename Next, typename... Args>
+    static constexpr auto parse(It& cur, It end, Next&& next, Args&&... args)
     {
         if (cur == end || *cur != C)
         {
             return false;
         }
         ++cur;
-        return true;
+        // no change to args
+        return next(cur, end, std::forward<Args>(args)...);
     }
 };
 
 struct period
 {
-    template <typename Iterator>
-    static constexpr auto match(Iterator& cur, Iterator end)
+    template <typename It, typename Next, typename... Args>
+    static constexpr auto parse(It& cur, It end, Next&& next, Args&&... args)
     {
         if (cur == end)
         {
             return false;
         }
         ++cur;
-        return true;
+        // no change to args
+        return next(cur, end, std::forward<Args>(args)...);
     }
 };
 
@@ -56,24 +60,31 @@ struct plus
     }
 };
 
-template <typename... Productions>
-struct seq
-{
-    template <typename Iterator>
-    static constexpr auto match(Iterator& cur, Iterator end)
-    {
-        if constexpr (sizeof...(Productions) == 0)
-        {
-            return true;
-        }
+template <typename... Ps>
+struct seq;
 
-        const auto copy = cur;
-        if ((Productions::match(cur, end) && ...))
-        {
-            return true;
-        }
-        cur = copy;
-        return false;
+template <typename First, typename... Rest>
+struct seq<First, Rest...>
+{
+    template <typename It, typename Next, typename... Args>
+    static constexpr auto parse(It& cur, It end, Next&& next, Args&&... args)
+    {
+        // construct the continuation for the first parser, which is a call to the second parser, etc.
+        // use auto&&... vals instead of args so first parser can add when it calls continuation
+        constexpr auto continuation = [&next](It& cur, It end, auto&&... vals)
+        { return seq<Rest...>::parse(cur, end, next, std::forward<decltype(vals)>(vals)...); };
+
+        return First::parse(cur, end, continuation, std::forward<Args>(args)...);
+    }
+};
+
+template <>
+struct seq<>
+{
+    template <typename It, typename Next, typename... Args>
+    static constexpr auto parse(It& cur, It end, Next&& next, Args&&... args)
+    {
+        return next(cur, end, std::forward<Args>(args)...);
     }
 };
 
@@ -104,11 +115,13 @@ struct branch<First>
     }
 };
 
-template <typename Production, typename Iterator>
-static constexpr auto parse(Iterator begin, Iterator end)
+// need to aggregate values here somehow
+template <typename P, typename It>
+static constexpr auto match(It begin, It end)
 {
-    auto res{Production::match(begin, end)};
-    return res && begin == end;
+    constexpr auto final_parser = [](It& cur, It end, auto&&... args) { return cur == end; };
+    const auto res{P::match::parse(begin, end, final_parser)};
+    return res;
 }
 
 }  // namespace parser

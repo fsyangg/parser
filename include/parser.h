@@ -1,7 +1,35 @@
 #pragma once
 
 #include <utility>
+#include <cassert>
 #include <string_view>
+
+namespace
+{
+
+template <std::integral T, std::input_iterator It, std::sentinel_for<It> S>
+constexpr auto constexpr_stoi(It begin, S end)
+{
+    bool neg{false};
+    if (begin != end && (*begin == '-' || *begin == '+'))
+    {
+        neg = (*begin == '-');
+        ++begin;
+    }
+
+    if constexpr (std::unsigned_integral<T>) {
+        assert(!neg);
+    }
+
+    T sum{0};
+    for (; begin != end; ++begin)
+    {
+        sum = sum * 10 + (*begin - '0');
+    }
+    return neg ? -sum : sum;
+}
+
+} // namespace
 
 namespace rp
 {
@@ -115,13 +143,20 @@ struct branch<First>
     }
 };
 
-template <typename P>
+template <typename P, typename T = std::string_view>
 struct emit
 {
     template <typename It, typename Next, typename... Args>
     static constexpr auto parse(It& cur, It end, Next&& next, Args&&... args)
     {
-        return next(cur, end, std::forward<Args>(args)..., std::string_view(cur, end));
+        if constexpr (std::integral<T>)
+        {
+            return next(cur, end, std::forward<Args>(args)..., constexpr_stoi<T>(cur, end));
+        }
+        else
+        {
+            return next(cur, end, std::forward<Args>(args)..., std::string_view(cur, end));
+        }
     }
 };
 

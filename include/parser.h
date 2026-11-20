@@ -1,4 +1,7 @@
+#pragma once
+
 #include <utility>
+#include <string_view>
 
 namespace rp
 {
@@ -71,7 +74,7 @@ struct seq<First, Rest...>
     {
         // construct the continuation for the first parser, which is a call to the second parser, etc.
         // use auto&&... vals instead of args so first parser can add when it calls continuation
-        constexpr auto continuation = [&next](It& cur, It end, auto&&... vals)
+        auto continuation = [&next](It& cur, It end, auto&&... vals)
         { return seq<Rest...>::parse(cur, end, next, std::forward<decltype(vals)>(vals)...); };
 
         return First::parse(cur, end, continuation, std::forward<Args>(args)...);

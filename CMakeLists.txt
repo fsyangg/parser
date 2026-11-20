@@ -24,11 +24,13 @@ enable_testing()
 add_executable(
     test_exe
     test/test_parser.cpp
+    test/test_actions.cpp
 )
 
 target_link_libraries(test_exe GTest::gtest_main)
 target_include_directories(test_exe PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/test/include
 )
 
 include(GoogleTest)

@@ -19,7 +19,6 @@ struct literal
             return false;
         }
         ++cur;
-        // no change to args
         return next(cur, end, std::forward<Args>(args)...);
     }
 };
@@ -34,7 +33,6 @@ struct period
             return false;
         }
         ++cur;
-        // no change to args
         return next(cur, end, std::forward<Args>(args)...);
     }
 };
@@ -113,18 +111,35 @@ struct branch<First>
     template <typename Iterator>
     static constexpr auto match(Iterator& cur, Iterator end)
     {
-        // do we need to unwind here, not sure
         return First::match(cur, end);
     }
 };
 
-// need to aggregate values here somehow
+template <typename P>
+struct emit
+{
+    template <typename It, typename Next, typename... Args>
+    static constexpr auto parse(It& cur, It end, Next&& next, Args&&... args)
+    {
+        return next(cur, end, std::forward<Args>(args)..., std::string_view(cur, end));
+    }
+};
+
+template <typename P, typename It>
+static constexpr auto parse_with_action(It begin, It end)
+{
+    constexpr auto final_parser = [](It& cur, It end, auto&&... vals)
+    {
+        return P::action(std::forward<decltype(vals)>(vals)...);
+    };
+    return P::match::parse(begin, end, final_parser);
+}
+
 template <typename P, typename It>
 static constexpr auto match(It begin, It end)
 {
-    constexpr auto final_parser = [](It& cur, It end, auto&&... args) { return cur == end; };
-    const auto res{P::match::parse(begin, end, final_parser)};
-    return res;
+    auto final_parser = [](It& cur, It end, auto&&... args) { return cur == end; };
+    return P::match::parse(begin, end, final_parser);
 }
 
 }  // namespace parser

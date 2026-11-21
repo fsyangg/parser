@@ -1,43 +1,29 @@
 #pragma once
 
-#include <utility>
-#include <cassert>
+#include <concepts>
 #include <string_view>
+#include <utility>
 
-namespace
-{
-
-template <std::integral T, std::input_iterator It, std::sentinel_for<It> S>
-constexpr auto constexpr_stoi(It begin, S end)
-{
-    bool neg{false};
-    if (begin != end && (*begin == '-' || *begin == '+'))
-    {
-        neg = (*begin == '-');
-        ++begin;
-    }
-
-    if constexpr (std::unsigned_integral<T>) {
-        assert(!neg);
-    }
-
-    T sum{0};
-    for (; begin != end; ++begin)
-    {
-        sum = sum * 10 + (*begin - '0');
-    }
-    return neg ? -sum : sum;
-}
-
-} // namespace
+#include "details.h"
 
 namespace rp
 {
 namespace parser
 {
 
+template <typename P>
+concept Production = requires {
+    typename P::match;
+    typename P::match::value_type;
+} && (!detail::has_action<P> || std::invocable<decltype(P::action)&, typename P::match::value_type>); // & necessary?
+
+struct matcher
+{
+    using value_type = void;
+};
+
 template <char C>
-struct literal
+struct literal : matcher
 {
     template <typename It, typename Next, typename... Args>
     static constexpr auto parse(It& cur, It end, Next&& next, Args&&... args)
@@ -51,7 +37,7 @@ struct literal
     }
 };
 
-struct period
+struct period : matcher
 {
     template <typename It, typename Next, typename... Args>
     static constexpr auto parse(It& cur, It end, Next&& next, Args&&... args)
@@ -66,7 +52,7 @@ struct period
 };
 
 template <typename Production>
-struct star
+struct star : matcher
 {
     template <typename Iterator>
     static constexpr auto match(Iterator& cur, Iterator end)
@@ -80,7 +66,7 @@ struct star
 };
 
 template <typename Production>
-struct plus
+struct plus : matcher
 {
     template <typename Iterator>
     static constexpr auto match(Iterator& cur, Iterator end)
@@ -93,7 +79,7 @@ template <typename... Ps>
 struct seq;
 
 template <typename First, typename... Rest>
-struct seq<First, Rest...>
+struct seq<First, Rest...> : matcher // TEMPORARY workaround
 {
     template <typename It, typename Next, typename... Args>
     static constexpr auto parse(It& cur, It end, Next&& next, Args&&... args)
@@ -108,7 +94,7 @@ struct seq<First, Rest...>
 };
 
 template <>
-struct seq<>
+struct seq<> : matcher // TEMPORARY workaround
 {
     template <typename It, typename Next, typename... Args>
     static constexpr auto parse(It& cur, It end, Next&& next, Args&&... args)
@@ -118,7 +104,7 @@ struct seq<>
 };
 
 template <typename First, typename... Rest>
-struct branch
+struct branch : matcher
 {
     template <typename Iterator>
     static constexpr auto match(Iterator& cur, Iterator end)
@@ -134,7 +120,7 @@ struct branch
 };
 
 template <typename First>
-struct branch<First>
+struct branch<First> : matcher
 {
     template <typename Iterator>
     static constexpr auto match(Iterator& cur, Iterator end)
@@ -146,12 +132,14 @@ struct branch<First>
 template <typename P, typename T = std::string_view>
 struct emit
 {
+    using value_type = T;
+
     template <typename It, typename Next, typename... Args>
     static constexpr auto parse(It& cur, It end, Next&& next, Args&&... args)
     {
         if constexpr (std::integral<T>)
         {
-            return next(cur, end, std::forward<Args>(args)..., constexpr_stoi<T>(cur, end));
+            return next(cur, end, std::forward<Args>(args)..., detail::constexpr_stoi<T>(cur, end));
         }
         else
         {
@@ -160,17 +148,15 @@ struct emit
     }
 };
 
-template <typename P, typename It>
+template <Production P, typename It>
 static constexpr auto parse_with_action(It begin, It end)
 {
     constexpr auto final_parser = [](It& cur, It end, auto&&... vals)
-    {
-        return P::action(std::forward<decltype(vals)>(vals)...);
-    };
+    { return P::action(std::forward<decltype(vals)>(vals)...); };
     return P::match::parse(begin, end, final_parser);
 }
 
-template <typename P, typename It>
+template <Production P, typename It>
 static constexpr auto match(It begin, It end)
 {
     auto final_parser = [](It& cur, It end, auto&&... args) { return cur == end; };

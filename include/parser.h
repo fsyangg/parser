@@ -1,10 +1,11 @@
 #pragma once
 
 #include <concepts>
+#include <meta>
+#include <optional>
 #include <string_view>
 #include <utility>
 #include <vector>
-#include <meta>
 
 #include "details.h"
 
@@ -28,10 +29,11 @@ struct literal : emits_nothing
 {
     template <typename It, typename Next, typename... Args>
     static constexpr auto parse(It& cur, It end, Next&& next, Args&&... args)
+        -> decltype(next(cur, end, std::forward<Args>(args)...))
     {
         if (cur == end || *cur != C)
         {
-            return false;
+            return {};  // a std::optional<T> of {} is 'empty'
         }
         ++cur;
         return next(cur, end, std::forward<Args>(args)...);
@@ -42,37 +44,40 @@ struct period : emits_nothing
 {
     template <typename It, typename Next, typename... Args>
     static constexpr auto parse(It& cur, It end, Next&& next, Args&&... args)
+        -> decltype(next(cur, end, std::forward<Args>(args)...))
     {
         if (cur == end)
         {
-            return false;
+            return {};
         }
         ++cur;
         return next(cur, end, std::forward<Args>(args)...);
     }
 };
 
+// TODO
 template <typename Production>
 struct star : emits_nothing
 {
     template <typename Iterator>
-    static constexpr auto match(Iterator& cur, Iterator end)
+    static constexpr auto parse(Iterator& cur, Iterator end)
     {
         if (cur == end || !Production::match(cur, end))
         {
-            return true;
+            return std::nullopt;
         }
         return match(cur, end);
     }
 };
 
+// TODO
 template <typename Production>
 struct plus : emits_nothing
 {
     template <typename Iterator>
-    static constexpr auto match(Iterator& cur, Iterator end)
+    static constexpr auto parse(Iterator& cur, Iterator end)
     {
-        return Production::match(cur, end) && star<Production>::match(cur, end);
+        return Production::parse(cur, end) && star<Production>::parse(cur, end);
     }
 };
 
@@ -84,7 +89,7 @@ struct seq<First, Rest...>
 {
     static consteval std::vector<std::meta::info> value_type()
     {
-        std::vector<std::meta::info> v{ First::value_type() };
+        std::vector<std::meta::info> v{First::value_type()};
         (v.append_range(Rest::value_type()), ...);
         return v;
     }
@@ -113,8 +118,9 @@ struct seq<>
     }
 };
 
+// TODO
 template <typename First, typename... Rest>
-struct branch : emits_nothing // TEMPORARY
+struct branch : emits_nothing  // TEMPORARY
 {
     template <typename Iterator>
     static constexpr auto match(Iterator& cur, Iterator end)
@@ -129,8 +135,9 @@ struct branch : emits_nothing // TEMPORARY
     }
 };
 
+// TODO
 template <typename First>
-struct branch<First> : emits_nothing // TEMPORARY
+struct branch<First> : emits_nothing  // TEMPORARY
 {
     template <typename Iterator>
     static constexpr auto match(Iterator& cur, Iterator end)
@@ -170,7 +177,8 @@ template <Production P, typename It>
 static constexpr auto parse_with_action(It begin, It end)
 {
     auto final_parser = [](It& cur, It end, auto&&... vals)
-    { return P::action(std::forward<decltype(vals)>(vals)...); };
+    { return std::optional{P::action(std::forward<decltype(vals)>(vals)...)}; };
+
     return P::match::parse(begin, end, final_parser);
 }
 

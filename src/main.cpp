@@ -1,14 +1,17 @@
 #include <string_view>
+#include <utility>
 
-#include "parser.h"
+#include "combinators.h"
+#include "parsers.h"
+#include "values.h"
 
 using namespace rp::parser;
 
 struct foo
 {
-    using match = emit<seq< emit< literal<'a'> >, emit< literal<'b'> >>>;
-    static constexpr auto action = [](std::string_view sv) {
-        return sv;
+    using match = seq< emit< literal<'a'> >, emit< literal<'b'> >>;
+    static constexpr auto action = [](std::string_view first, std::string_view second) {
+        return std::make_pair(first, second);
     };
 };
 
@@ -17,5 +20,9 @@ int main() {
 
     constexpr std::string_view a{"ab"};
     constexpr auto s{parse_with_action<foo>(a.begin(), a.end())};
-    static_assert(s.has_value() && s == "ab");
+    static_assert(s.has_value());
+
+    constexpr auto first = s->first;
+    constexpr auto second = s->second;
+    static_assert(first == "a" && second == "b");
 }

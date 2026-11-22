@@ -3,6 +3,8 @@
 #include <concepts>
 #include <string_view>
 #include <utility>
+#include <vector>
+#include <meta>
 
 #include "details.h"
 
@@ -14,16 +16,15 @@ namespace parser
 template <typename P>
 concept Production = requires {
     typename P::match;
-    typename P::match::value_type;
-} && (!detail::has_action<P> || std::invocable<decltype(P::action)&, typename P::match::value_type>); // & necessary?
+} && (!detail::has_action<P> || std::meta::is_invocable_type(^^decltype(P::action)&, P::match::value_type()));
 
-struct matcher
+struct emits_nothing
 {
-    using value_type = void;
+    static consteval std::vector<std::meta::info> value_type() { return {}; };
 };
 
 template <char C>
-struct literal : matcher
+struct literal : emits_nothing
 {
     template <typename It, typename Next, typename... Args>
     static constexpr auto parse(It& cur, It end, Next&& next, Args&&... args)
@@ -37,7 +38,7 @@ struct literal : matcher
     }
 };
 
-struct period : matcher
+struct period : emits_nothing
 {
     template <typename It, typename Next, typename... Args>
     static constexpr auto parse(It& cur, It end, Next&& next, Args&&... args)
@@ -52,7 +53,7 @@ struct period : matcher
 };
 
 template <typename Production>
-struct star : matcher
+struct star : emits_nothing
 {
     template <typename Iterator>
     static constexpr auto match(Iterator& cur, Iterator end)
@@ -66,7 +67,7 @@ struct star : matcher
 };
 
 template <typename Production>
-struct plus : matcher
+struct plus : emits_nothing
 {
     template <typename Iterator>
     static constexpr auto match(Iterator& cur, Iterator end)
@@ -79,8 +80,15 @@ template <typename... Ps>
 struct seq;
 
 template <typename First, typename... Rest>
-struct seq<First, Rest...> : matcher // TEMPORARY workaround
+struct seq<First, Rest...>
 {
+    static consteval std::vector<std::meta::info> value_type()
+    {
+        std::vector<std::meta::info> v{ First::value_type() };
+        (v.append_range(Rest::value_type()), ...);
+        return v;
+    }
+
     template <typename It, typename Next, typename... Args>
     static constexpr auto parse(It& cur, It end, Next&& next, Args&&... args)
     {
@@ -94,8 +102,10 @@ struct seq<First, Rest...> : matcher // TEMPORARY workaround
 };
 
 template <>
-struct seq<> : matcher // TEMPORARY workaround
+struct seq<>
 {
+    static consteval std::vector<std::meta::info> value_type() { return {}; };
+
     template <typename It, typename Next, typename... Args>
     static constexpr auto parse(It& cur, It end, Next&& next, Args&&... args)
     {
@@ -104,7 +114,7 @@ struct seq<> : matcher // TEMPORARY workaround
 };
 
 template <typename First, typename... Rest>
-struct branch : matcher
+struct branch : emits_nothing // TEMPORARY
 {
     template <typename Iterator>
     static constexpr auto match(Iterator& cur, Iterator end)
@@ -120,7 +130,7 @@ struct branch : matcher
 };
 
 template <typename First>
-struct branch<First> : matcher
+struct branch<First> : emits_nothing // TEMPORARY
 {
     template <typename Iterator>
     static constexpr auto match(Iterator& cur, Iterator end)
@@ -132,26 +142,34 @@ struct branch<First> : matcher
 template <typename P, typename T = std::string_view>
 struct emit
 {
-    using value_type = T;
+    static consteval std::vector<std::meta::info> value_type() { return {^^T}; };
 
     template <typename It, typename Next, typename... Args>
     static constexpr auto parse(It& cur, It end, Next&& next, Args&&... args)
     {
-        if constexpr (std::integral<T>)
+        // P::parse() will bump cur to where the match ended, so matched string is from start -> where cur is at end
+        const It start = cur;
+        auto continuation = [&start, &next, &args...](It& cur, It end, auto&&... vals)
         {
-            return next(cur, end, std::forward<Args>(args)..., detail::constexpr_stoi<T>(cur, end));
-        }
-        else
-        {
-            return next(cur, end, std::forward<Args>(args)..., std::string_view(cur, end));
-        }
+            const std::string_view text(start, cur);
+            if constexpr (std::integral<T>)
+            {
+                return next(cur, end, std::forward<Args>(args)..., detail::constexpr_stoi<T>(text.begin(), text.end()));
+            }
+            else
+            {
+                return next(cur, end, std::forward<Args>(args)..., text);
+            }
+        };
+
+        return P::parse(cur, end, continuation);
     }
 };
 
 template <Production P, typename It>
 static constexpr auto parse_with_action(It begin, It end)
 {
-    constexpr auto final_parser = [](It& cur, It end, auto&&... vals)
+    auto final_parser = [](It& cur, It end, auto&&... vals)
     { return P::action(std::forward<decltype(vals)>(vals)...); };
     return P::match::parse(begin, end, final_parser);
 }

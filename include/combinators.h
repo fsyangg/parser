@@ -14,16 +14,20 @@ namespace parser
 
 // TODO
 template <typename Production>
-struct star : emits_nothing
+struct star
 {
-    template <typename Iterator>
-    static constexpr auto parse(Iterator& cur, Iterator end)
+    static consteval std::vector<std::meta::info> value_type()
+    {
+    }
+
+    template <typename It, typename Next, typename... Args>
+    static constexpr auto parse(It& cur, It end, Next&& next, Args&&... args)
     {
         if (cur == end || !Production::match(cur, end))
         {
-            return std::nullopt;
+            return next(cur, end, std::forward<Args>(args)...);
         }
-        return match(cur, end);
+        return parse(cur, end);
     }
 };
 

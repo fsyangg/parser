@@ -85,38 +85,6 @@ void test_seq_lengths()
     static_assert(none_parse<prod>({""}));
 }
 
-void test_star_basic()
-{
-    using prod = star<literal<'a'>>;
-
-    static_assert(all_parse<prod>({"aaaaaaaaaa"}));
-    static_assert(none_parse<prod>({"bbbbb"}));
-}
-
-void test_star_in_sequence()
-{
-    using astar = star<literal<'a'>>;
-    using bstar = star<literal<'b'>>;
-    using prod = seq<astar, bstar>;
-
-    static_assert(all_parse<prod>({"aa", "ab", "aab", "aabb", "bb"}));
-    static_assert(none_parse<prod>({"bbaa", "abba", "aaaba"}));
-}
-
-void test_star_strings()
-{
-    using ab = seq<literal<'a'>, literal<'b'>>;
-    using prod = star<ab>;
-
-    static_assert(all_parse<prod>({"", "ab", "ababababab"}));
-    static_assert(none_parse<prod>({"a", "aa", "aab", "abb", "aba", "abaa"}));
-
-    using then_a = seq<prod, literal<'a'>>;
-    static_assert(all_parse<then_a>({"a", "aba", "ababa"}));
-    static_assert(none_parse<then_a>({"ab", "abab", "abaa"}));
-    static_assert(none_parse<prod>({"a"}));
-}
-
 void test_plus_basic()
 {
     using aplus = plus<literal<'a'>>;

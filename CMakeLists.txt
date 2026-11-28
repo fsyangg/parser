@@ -12,27 +12,27 @@ target_include_directories(main PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-# include(FetchContent)
-# FetchContent_Declare(
-#   googletest
-#   URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
-# )
-# FetchContent_MakeAvailable(googletest)
+include(FetchContent)
+FetchContent_Declare(
+  googletest
+  URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
+)
+FetchContent_MakeAvailable(googletest)
 
-# enable_testing()
+enable_testing()
 
-# add_executable(
-#     test_exe
-#     test/test_parser.cpp
-#     test/test_actions.cpp
-# )
-# 
-# target_link_libraries(test_exe GTest::gtest_main)
-# target_compile_options(test_exe PRIVATE -freflection)
-# target_include_directories(test_exe PRIVATE
-#     ${CMAKE_CURRENT_SOURCE_DIR}/include
-#     ${CMAKE_CURRENT_SOURCE_DIR}/test/include
-# )
-# 
-# include(GoogleTest)
-# gtest_discover_tests(test_exe)
+add_executable(
+    test_exe
+    test/test_parser.cpp
+    test/test_actions.cpp
+)
+
+target_link_libraries(test_exe GTest::gtest_main)
+target_compile_options(test_exe PRIVATE -freflection)
+target_include_directories(test_exe PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/test/include
+)
+
+include(GoogleTest)
+gtest_discover_tests(test_exe)

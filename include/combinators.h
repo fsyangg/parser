@@ -37,7 +37,7 @@ struct star
         const It start = cur;
         It tmp = cur;
 
-        // prod failing gives {}, bool{} == false. otherwise collector gives true
+        // parse failing gives {}, bool{} == false. otherwise collector gives true
         while (bool matched{Production::parse(cur, end, collector)})
         {
             // lowk edge case but if star is empty

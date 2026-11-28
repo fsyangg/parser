@@ -12,22 +12,44 @@ namespace rp
 namespace parser
 {
 
-// TODO
 template <typename Production>
 struct star
 {
     static consteval std::vector<std::meta::info> value_type()
     {
+        // clang-format off
+        using namespace std::meta;
+        return {substitute(^^std::vector, {substitute(^^std::tuple, Production::value_type())})};
+        // clang-format on
     }
 
     template <typename It, typename Next, typename... Args>
     static constexpr auto parse(It& cur, It end, Next&& next, Args&&... args)
     {
-        if (cur == end || !Production::match(cur, end))
+        typename[:value_type()[0]:] acc;
+
+        auto collector = [&](It&, It, auto&&... vals)
         {
-            return next(cur, end, std::forward<Args>(args)...);
+            acc.emplace_back(std::forward<decltype(vals)>(vals)...);
+            return true;
+        };
+
+        const It start = cur;
+        It tmp = cur;
+
+        // prod failing gives {}, bool{} == false. otherwise collector gives true
+        while (bool matched{Production::parse(cur, end, collector)})
+        {
+            // lowk edge case but if star is empty
+            if (cur == tmp)
+            {
+                break;
+            }
+            tmp = cur;
         }
-        return parse(cur, end);
+
+        cur = tmp;
+        return next(cur, end, std::forward<Args>(args)..., std::move(acc));
     }
 };
 
